@@ -461,10 +461,10 @@ async function test() {
   await WebNNConvGPUWithTf(inputDims, filterDims);
   await WebNNConvGPU(inputDims, filterDims);
   await WebNNConvCPU(inputDims, filterDims);
-  await tfConv2dx2(inputDims, filterDims);
-  await WebNNConvGPUx2WithTf(inputDims, filterDims);
-  await WebNNConvGPUx2Model(inputDims, filterDims);
-  await WebNNConvGPUx2(inputDims, filterDims);
+  // await tfConv2dx2(inputDims, filterDims);
+  // await WebNNConvGPUx2WithTf(inputDims, filterDims);
+  // await WebNNConvGPUx2Model(inputDims, filterDims);
+  // await WebNNConvGPUx2(inputDims, filterDims);
   document.getElementById('output').innerHTML += `Done`;
 }
 
