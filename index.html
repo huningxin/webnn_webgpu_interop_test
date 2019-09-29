@@ -1,0 +1,19 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>WebNN-WebGPU Interop Test</title>
+    </head>
+    <body>
+        <h4>WebNN-WebGPU Interop Test <hr/></h4>
+        <button id="start" disabled="true">Start</button>
+        <h5 id="backend"></h5>
+        <h5 id="size"></h5>
+        <div id="output"><br/></div>
+        <script src="./lib/tf.min.js"></script>
+        <script src="./lib/tf-webgpu.min.js"></script>
+        <script src="main.js"></script>
+        <script>
+            main();
+        </script>  
+    </body>
+</html>
