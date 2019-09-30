@@ -8,6 +8,12 @@ const bias2Value = 0.2;
 
 const iterations = 100;
 
+const noBias = 0;
+const noRelu = false;
+const fuseRelu = true;
+
+let testNum = 1;
+
 function product(shape) {
   let result = 1;
   for (let i = 0; i < shape.length; i++) {
@@ -64,7 +70,7 @@ async function createWebNNConv(filterValue, biasValue, hasRelu) {
 }
 
 let webgpu_exe = false;
-function executeWebNNForGPU(execution, input, output) {
+function executeWithGPUBuffer(execution, input, output) {
   if (webgpu_exe) {
     const commandEncoder = tf.backend().device.createCommandEncoder();
     commandEncoder.setNnGraphInput(input, 0, execution);
@@ -102,14 +108,14 @@ async function tfConv2d(inputDims, filterDims){
     result = await reluOutput.data();
   }
   const elapsedTime = ((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d/add/relu (WebGPU): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d/add/relu (WebGPU): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
 async function WebNNConvGPUWithTf(inputDims, filterDims) {
   const nn = navigator.ml.getNeuralNetworkContext();
-  const nnConv = await createWebNNConv(filterValue, 0, false);
-  const compilation = await nnConv.createCompilation();
+  const model = await createWebNNConv(filterValue, noBias, noRelu);
+  const compilation = await model.createCompilation();
   compilation.setGPUDevice(tf.backend().device);
   compilation.setPreference(nn.PREFER_SUSTAINED_SPEED);
   await compilation.finish();
@@ -126,27 +132,27 @@ async function WebNNConvGPUWithTf(inputDims, filterDims) {
   // warm up
   const inputBuffer = tf.backend().getBuffer(input.dataId);
   const outputBuffer = tf.backend().getBuffer(output.dataId);
-  executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+  executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
   let addOutput = tf.add(output, bias);
   let reluOutput = tf.relu(addOutput);
   let result = await reluOutput.data();
 
   const start = performance.now();
   for (let i = 0; i < iterations; i++) {
-    executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+    executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
     addOutput = tf.add(output, bias);
     reluOutput = tf.relu(addOutput);
     result = await reluOutput.data();
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d (WebNN) -> WebGPUBuffer -> add/relu (WebGPU): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d (WebNN) -> WebGPUBuffer -> add/relu (WebGPU): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
 async function WebNNConvGPU(inputDims, filterDims) {
   const nn = navigator.ml.getNeuralNetworkContext();
-  const nnConv = await createWebNNConv(filterValue, biasValue, true);
-  const compilation = await nnConv.createCompilation();
+  const model = await createWebNNConv(filterValue, biasValue, fuseRelu);
+  const compilation = await model.createCompilation();
   compilation.setGPUDevice(tf.backend().device);
   compilation.setPreference(nn.PREFER_SUSTAINED_SPEED);
   await compilation.finish();
@@ -160,7 +166,7 @@ async function WebNNConvGPU(inputDims, filterDims) {
   const outputBuffer = tf.backend().getBuffer(outputTensor.dataId);
 
   // warm up
-  executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+  executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
   // bypass convertAndCacheOnCPU
   let info = tf.backend().tensorMap.get(outputTensor.dataId);
   let data = await tf.backend().getBufferData(info);
@@ -168,20 +174,20 @@ async function WebNNConvGPU(inputDims, filterDims) {
 
   const start = performance.now();
   for (let i = 0; i < iterations; i++) {
-    executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+    executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
     // bypass convertAndCacheOnCPU
     info = tf.backend().tensorMap.get(outputTensor.dataId);
     data = await tf.backend().getBufferData(info);
     result = new Float32Array(data);
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d/bias/relu (WebNN): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d/bias/relu (WebNN): ${elapsedTime} ms <br/>`;
   console.log(result);  
 }
 
 async function WebNNConvCPU(inputDims, filterDims) {
   const nn = navigator.ml.getNeuralNetworkContext();
-  const model = await createWebNNConv(filterValue, biasValue, true);
+  const model = await createWebNNConv(filterValue, biasValue, fuseRelu);
   const compilation = await model.createCompilation();
   compilation.setPreference(nn.PREFER_SUSTAINED_SPEED);
   await compilation.finish();
@@ -200,13 +206,13 @@ async function WebNNConvCPU(inputDims, filterDims) {
     await execution.startCompute();
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `ArrayBuffer -> conv2d/bias/relu (WebNN) -> ArrayBuffer: ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - ArrayBufferView -> conv2d/bias/relu (WebNN) -> ArrayBufferView: ${elapsedTime} ms <br/>`;
   console.log(output);
 }
 
 async function WebNNConvCPUWithTf(inputDims, filterDims) {
   const nn = navigator.ml.getNeuralNetworkContext();
-  const model = await createWebNNConv(filterValue, 0, false);
+  const model = await createWebNNConv(filterValue, noBias, noRelu);
   const compilation = await model.createCompilation();
   compilation.setPreference(nn.PREFER_SUSTAINED_SPEED);
   await compilation.finish();
@@ -237,7 +243,7 @@ async function WebNNConvCPUWithTf(inputDims, filterDims) {
     result = await reluOutput.data();
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d (WebNN) -> ArrayBuffer -> add/relu (WebGPU): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d (WebNN) -> ArrayBufferView -> add/relu (WebGPU): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
@@ -273,7 +279,7 @@ async function tfConv2dx2(inputDims, filterDims){
     result = await im5.data();
   }
   const elapsedTime = ((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d/add/relu x2 (WebGPU): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d/add/relu x2 (WebGPU): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
@@ -344,7 +350,7 @@ async function WebNNConvGPUx2(inputDims, filterDims) {
   const outputBuffer = tf.backend().getBuffer(outputTensor.dataId);
 
   // warm up
-  executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+  executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
   // bypass convertAndCacheOnCPU
   let info = tf.backend().tensorMap.get(outputTensor.dataId);
   let data = await tf.backend().getBufferData(info);
@@ -352,26 +358,26 @@ async function WebNNConvGPUx2(inputDims, filterDims) {
 
   const start = performance.now();
   for (let i = 0; i < iterations; i++) {
-    executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+    executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
     info = tf.backend().tensorMap.get(outputTensor.dataId);
     data = await tf.backend().getBufferData(info);
     result = new Float32Array(data);
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d/bias/relu x2 (WebNN): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d/bias/relu x2 (WebNN): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
 async function WebNNConvGPUx2Model(inputDims, filterDims) {
   const nn = navigator.ml.getNeuralNetworkContext();
-  const model1 = await createWebNNConv(filterValue, biasValue, true);
+  const model1 = await createWebNNConv(filterValue, biasValue, fuseRelu);
   const compilation1 = await model1.createCompilation();
   compilation1.setGPUDevice(tf.backend().device);
   compilation1.setPreference(nn.PREFER_SUSTAINED_SPEED);
   await compilation1.finish();
   const execution1 = await compilation1.createExecution();
 
-  const model2 = await createWebNNConv(filterValue, bias2Value, true);
+  const model2 = await createWebNNConv(filterValue, bias2Value, fuseRelu);
   const compilation2 = await model2.createCompilation();
   compilation2.setGPUDevice(tf.backend().device);
   compilation2.setPreference(nn.PREFER_SUSTAINED_SPEED);
@@ -389,8 +395,8 @@ async function WebNNConvGPUx2Model(inputDims, filterDims) {
   const outputBuffer = tf.backend().getBuffer(outputTensor.dataId);
 
   // warm up
-  executeWebNNForGPU(execution1, inputBuffer, immediateBuffer);
-  executeWebNNForGPU(execution2, immediateBuffer, outputBuffer);
+  executeWithGPUBuffer(execution1, inputBuffer, immediateBuffer);
+  executeWithGPUBuffer(execution2, immediateBuffer, outputBuffer);
   // bypass convertAndCacheOnCPU
   let info = tf.backend().tensorMap.get(outputTensor.dataId);
   let data = await tf.backend().getBufferData(info);
@@ -398,20 +404,20 @@ async function WebNNConvGPUx2Model(inputDims, filterDims) {
 
   const start = performance.now();
   for (let i = 0; i<iterations; i++) {
-    executeWebNNForGPU(execution1, inputBuffer, immediateBuffer);
-    executeWebNNForGPU(execution2, immediateBuffer, outputBuffer);
+    executeWithGPUBuffer(execution1, inputBuffer, immediateBuffer);
+    executeWithGPUBuffer(execution2, immediateBuffer, outputBuffer);
     info = tf.backend().tensorMap.get(outputTensor.dataId);
     data = await tf.backend().getBufferData(info);
     result = new Float32Array(data);
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d/bias/relu (WebNN) -> WebGPUBuffer -> conv2d/bias/relu (WebNN): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d/bias/relu (WebNN) -> WebGPUBuffer -> conv2d/bias/relu (WebNN): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
 async function WebNNConvGPUx2WithTf(inputDims, filterDims) {
   const nn = navigator.ml.getNeuralNetworkContext();
-  const model = await createWebNNConv(filterValue, biasValue, true);
+  const model = await createWebNNConv(filterValue, biasValue, fuseRelu);
   const compilation = await model.createCompilation();
   compilation.setGPUDevice(tf.backend().device);
   compilation.setPreference(nn.PREFER_SUSTAINED_SPEED);
@@ -432,21 +438,21 @@ async function WebNNConvGPUx2WithTf(inputDims, filterDims) {
   const biasData = new Float32Array(filterDims[3]);
   biasData.fill(bias2Value);
   const bias = tf.tensor(biasData, [filterDims[3]]);
-  executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+  executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
   let convOutput = tf.conv2d(outputTensor, filter, 1, 'same');
   let addOutput = tf.add(convOutput, bias);
   let reluOutput = tf.relu(addOutput);
   let result = await reluOutput.data();
   let start = performance.now();
   for (let i = 0; i < iterations; i++) {
-    executeWebNNForGPU(execution, inputBuffer, outputBuffer);
+    executeWithGPUBuffer(execution, inputBuffer, outputBuffer);
     convOutput = tf.conv2d(outputTensor, filter, 1, 'same');
     addOutput = tf.add(convOutput, bias);
     reluOutput = tf.relu(addOutput);
     result = await reluOutput.data();
   }
   const elapsedTime =((performance.now() - start) / iterations).toFixed(2);
-  document.getElementById('output').innerHTML += `conv2d/bias/relu (WebNN) -> WebGPUBuffer -> conv2d/bias/relu (WebGPU): ${elapsedTime} ms <br/>`;
+  document.getElementById('output').innerHTML += `Test${testNum++} - conv2d/bias/relu (WebNN) -> WebGPUBuffer -> conv2d/bias/relu (WebGPU): ${elapsedTime} ms <br/>`;
   console.log(result);
 }
 
