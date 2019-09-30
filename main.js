@@ -71,16 +71,16 @@ async function createWebNNConv(filterValue, biasValue, hasRelu) {
 
 let webgpu_exe = false;
 function executeWithGPUBuffer(execution, input, output) {
-  if (webgpu_exe) {
+  if (!webgpu_exe) {
+    execution.setInputGPUBuffer(0, input);
+    execution.setOutputGPUBuffer(0, output);
+    execution.startCompute();
+  } else {
     const commandEncoder = tf.backend().device.createCommandEncoder();
     commandEncoder.setNnGraphInput(input, 0, execution);
     commandEncoder.setNnGraphOutput(output, 0, execution);
     commandEncoder.executeNnGraph(execution);
     device.getQueue().submit([commandEncoder.finish()]);
-  } else {
-    execution.setInputGPUBuffer(0, input);
-    execution.setOutputGPUBuffer(0, output);
-    execution.startCompute();
   }
 }
 
